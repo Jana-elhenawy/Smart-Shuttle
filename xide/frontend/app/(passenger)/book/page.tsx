@@ -5,9 +5,9 @@ import { z } from 'zod'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Shield, Lock } from 'lucide-react'
 import { useRideStore } from '@/store/rideStore'
-import { createClient } from '@/lib/supabase/client'
 import LocationInputs from '@/components/ride/LocationInputs'
 import SafeModeToggle from '@/components/ride/SafeModeToggle'
+import TripzyLogo from '@/components/brand/TripzyLogo'
 
 const schema = z.object({
   pickup_address: z.string().min(3, 'Enter pickup location'),
@@ -19,7 +19,6 @@ type FormData = z.infer<typeof schema>
 
 export default function BookPage() {
   const router = useRouter()
-  const supabase = createClient()
   const { pickup, destination, safeMode, setCurrentRequest } = useRideStore()
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
@@ -33,30 +32,18 @@ export default function BookPage() {
   })
 
   const onSubmit = async (data: FormData) => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return router.push('/login')
-
-    const scheduledTime = new Date(`${data.scheduled_date}T${data.scheduled_time}:00`)
-
-    const { data: request, error } = await supabase
-      .from('ride_requests')
-      .insert({
-        passenger_id: user.id,
-        pickup_lat: pickup?.lat ?? 30.037,
-        pickup_lng: pickup?.lng ?? 31.212,
-        pickup_address: data.pickup_address,
-        dest_lat: destination?.lat ?? 30.026,
-        dest_lng: destination?.lng ?? 31.213,
-        dest_address: data.dest_address,
-        scheduled_time: scheduledTime.toISOString(),
-        safe_mode: safeMode,
-        status: 'PENDING',
-      })
-      .select()
-      .single()
-
-    if (error) return alert('Failed to create request: ' + error.message)
-    setCurrentRequest(request)
+    // ── Demo mode: skip Supabase, go straight to matching ────────────
+    // Store a mock request in Zustand so matching page can read pickup/dest
+    setCurrentRequest({
+      request_id: 'demo-001',
+      passenger_id: 'demo-user',
+      pickup: { lat: pickup?.lat ?? 30.037, lng: pickup?.lng ?? 31.212, address: data.pickup_address },
+      destination: { lat: destination?.lat ?? 30.026, lng: destination?.lng ?? 31.213, address: data.dest_address },
+      scheduled_time: new Date(`${data.scheduled_date}T${data.scheduled_time}:00`).toISOString(),
+      safe_mode: safeMode,
+      status: 'PENDING',
+      created_at: new Date().toISOString(),
+    })
     router.push('/matching')
   }
 
@@ -67,7 +54,9 @@ export default function BookPage() {
           className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center">
           <ArrowLeft size={18} />
         </button>
-        <h1 className="font-semibold text-[#2A323F]">Plan your ride</h1>
+        <TripzyLogo size={30} wordmarkClass="text-[#2A323F] font-bold text-base" />
+        <div className="flex-1" />
+        <span className="text-xs text-gray-400 font-medium">Plan your ride</span>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-0 p-4">
